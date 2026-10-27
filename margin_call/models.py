@@ -26,6 +26,24 @@ class PortfolioValuation:
         return self.total_value / self.margin_requirement
 
 
+@dataclass(frozen=True)
+class TriggerMarginCall:
+    shortfall: float
+
+
+@dataclass(frozen=True)
+class Recover:
+    pass
+
+
+@dataclass(frozen=True)
+class NoAction:
+    pass
+
+
+MarginDecision = TriggerMarginCall | Recover | NoAction
+
+
 @dataclass
 class Account:
     id: str

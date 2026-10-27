@@ -3,11 +3,18 @@ from unittest.mock import patch
 import pytest
 
 from margin_call.margin_call import (
-    evaluate_margin,
+    decide_margin_action,
     process_margin_call,
     value_portfolio,
 )
-from margin_call.models import Account, AccountStatus, Position
+from margin_call.models import (
+    Account,
+    AccountStatus,
+    NoAction,
+    Position,
+    Recover,
+    TriggerMarginCall,
+)
 
 
 def make_account(status=AccountStatus.HEALTHY, positions=None):
@@ -94,60 +101,63 @@ class TestValuePortfolio:
         assert valuation.margin_level is None
 
 
-# Only the writes need patching now.
-@patch("margin_call.margin_call.email_service")
-@patch("margin_call.margin_call.db")
-class TestEvaluateMargin:
+# Pure core: the decision policy, no mocks.
+class TestDecideMarginAction:
 
-    def test_healthy_account_does_nothing(self, mock_db, mock_email):
+    def test_healthy_account_no_action(self):
+        # level = 1000 / 250 = 4.0
         account = make_account(positions=[
             Position(asset_id="AAPL", quantity=10, margin_rate=0.25),
         ])
+        valuation = value_portfolio(account.positions, {"AAPL": 100.0})
 
-        evaluate_margin(account, {"AAPL": 100.0})
+        assert decide_margin_action(account, valuation) == NoAction()
 
-        assert account.status is AccountStatus.HEALTHY
-        mock_db.accounts.save.assert_not_called()
-        mock_email.send_margin_call_alert.assert_not_called()
-
-    def test_margin_call_triggered(self, mock_db, mock_email):
-        # value = 10 * 100 = 1000; requirement = 1000 * 1.5 = 1500
-        # margin_level = 1000 / 1500 < 1.0 -> shortfall = 500
+    def test_below_requirement_triggers_margin_call(self):
+        # value 1000, requirement 1500 -> shortfall 500
         account = make_account(positions=[
             Position(asset_id="TSLA", quantity=10, margin_rate=1.5),
         ])
+        valuation = value_portfolio(account.positions, {"TSLA": 100.0})
 
-        evaluate_margin(account, {"TSLA": 100.0})
+        decision = decide_margin_action(account, valuation)
 
-        assert account.status is AccountStatus.MARGIN_CALL
-        assert account.margin_shortfall == pytest.approx(500.0)
-        mock_db.accounts.save.assert_called_once_with(account)
-        mock_email.send_margin_call_alert.assert_called_once_with(
-            "trader@example.com", pytest.approx(500.0)
-        )
+        assert decision == TriggerMarginCall(shortfall=pytest.approx(500.0))
 
-    def test_recovery_back_to_healthy(self, mock_db, mock_email):
-        # value = 10 * 100 = 1000; requirement = 1000 * 0.5 = 500
-        # margin_level = 2.0 > 1.5 and status is MARGIN_CALL -> recover
+    def test_recovers_above_threshold_when_in_margin_call(self):
+        # level = 1000 / 500 = 2.0 > 1.5
         account = make_account(status=AccountStatus.MARGIN_CALL, positions=[
             Position(asset_id="AAPL", quantity=10, margin_rate=0.5),
         ])
+        valuation = value_portfolio(account.positions, {"AAPL": 100.0})
 
-        evaluate_margin(account, {"AAPL": 100.0})
+        assert decide_margin_action(account, valuation) == Recover()
 
-        assert account.status is AccountStatus.HEALTHY
-        assert account.margin_shortfall == 0.0
-        mock_db.accounts.save.assert_called_once_with(account)
-        mock_email.send_margin_call_alert.assert_not_called()
+    def test_high_level_but_already_healthy_no_action(self):
+        # Same valuation as recovery, but status is HEALTHY
+        account = make_account(positions=[
+            Position(asset_id="AAPL", quantity=10, margin_rate=0.5),
+        ])
+        valuation = value_portfolio(account.positions, {"AAPL": 100.0})
 
-    def test_zero_margin_requirement_does_nothing(self, mock_db, mock_email):
+        assert decide_margin_action(account, valuation) == NoAction()
+
+    def test_in_hysteresis_band_no_action(self):
+        # level = 1000 / 800 = 1.25: above 1.0, below 1.5 -> stay put
+        account = make_account(status=AccountStatus.MARGIN_CALL, positions=[
+            Position(asset_id="AAPL", quantity=10, margin_rate=0.8),
+        ])
+        valuation = value_portfolio(account.positions, {"AAPL": 100.0})
+
+        assert decide_margin_action(account, valuation) == NoAction()
+
+    def test_no_margin_requirement_no_action(self):
         account = make_account(positions=[
             Position(asset_id="AAPL", quantity=10, margin_rate=0.0),
         ])
+        valuation = value_portfolio(account.positions, {"AAPL": 100.0})
 
-        evaluate_margin(account, {"AAPL": 100.0})
-
-        mock_db.accounts.save.assert_not_called()
+        assert decide_margin_action(account, valuation) == NoAction()
 
 
 # The "not found" case belongs to the shell, so it keeps its db patch.
