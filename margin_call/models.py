@@ -63,3 +63,17 @@ class Account:
     @property
     def in_margin_call(self) -> bool:
         return self.status is AccountStatus.MARGIN_CALL
+
+
+@dataclass(frozen=True)
+class AccountSnapshot:
+    status: AccountStatus
+    positions: tuple[Position, ...]
+
+    @property
+    def in_margin_call(self) -> bool:
+        return self.status is AccountStatus.MARGIN_CALL
+
+    @classmethod
+    def of(cls, account: Account) -> "AccountSnapshot":
+        return cls(status=account.status, positions=tuple(account.positions))

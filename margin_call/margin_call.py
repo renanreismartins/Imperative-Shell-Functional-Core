@@ -2,7 +2,12 @@ from margin_call.core import decide_margin_action, value_portfolio
 from margin_call.infra.database import db
 from margin_call.infra.email_service import email_service
 from margin_call.infra.market_data_api import market_data_api
-from margin_call.models import NoAction, Recover, TriggerMarginCall
+from margin_call.models import (
+    AccountSnapshot,
+    NoAction,
+    Recover,
+    TriggerMarginCall,
+)
 
 
 class AccountNotFoundError(Exception):
@@ -16,11 +21,12 @@ def process_margin_call(account_id: str) -> None:
     if not account:
         raise AccountNotFoundError(account_id)
 
-    asset_ids = [p.asset_id for p in account.positions]
+    snapshot = AccountSnapshot.of(account)
+    asset_ids = [p.asset_id for p in snapshot.positions]
     market_prices = market_data_api.get_latest_prices(asset_ids)
 
-    valuation = value_portfolio(account.positions, market_prices)
-    decision = decide_margin_action(account, valuation)
+    valuation = value_portfolio(snapshot.positions, market_prices)
+    decision = decide_margin_action(snapshot, valuation)
 
     match decision:
         case TriggerMarginCall(shortfall=shortfall):

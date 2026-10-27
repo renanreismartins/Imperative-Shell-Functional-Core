@@ -1,5 +1,5 @@
 from margin_call.models import (
-    Account,
+    AccountSnapshot,
     MarginDecision,
     NoAction,
     PortfolioValuation,
@@ -10,7 +10,7 @@ from margin_call.models import (
 
 
 def value_portfolio(
-    positions: list[Position], market_prices: dict[str, float]
+    positions: tuple[Position, ...], market_prices: dict[str, float]
 ) -> PortfolioValuation:
     total_value = 0.0
     margin_requirement = 0.0
@@ -25,7 +25,7 @@ def value_portfolio(
 
 
 def decide_margin_action(
-    account: Account, valuation: PortfolioValuation
+    snapshot: AccountSnapshot, valuation: PortfolioValuation
 ) -> MarginDecision:
     if valuation.margin_level is None:
         return NoAction()
@@ -35,7 +35,7 @@ def decide_margin_action(
             shortfall=valuation.margin_requirement - valuation.total_value
         )
 
-    if valuation.margin_level > 1.5 and account.in_margin_call:
+    if valuation.margin_level > 1.5 and snapshot.in_margin_call:
         return Recover()
 
     return NoAction()

@@ -1,4 +1,4 @@
-from margin_call.models import Account, AccountStatus
+from margin_call.models import Account, AccountSnapshot, AccountStatus
 
 
 def make_account(status=AccountStatus.HEALTHY, positions=None):
@@ -8,3 +8,7 @@ def make_account(status=AccountStatus.HEALTHY, positions=None):
         status=status,
         positions=positions or [],
     )
+
+
+def make_snapshot(status=AccountStatus.HEALTHY, positions=()):
+    return AccountSnapshot(status=status, positions=tuple(positions))
