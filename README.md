@@ -1,46 +1,38 @@
 # Isolating IO
 
-Two implementations of the same margin-call workflow:
+A margin-call workflow for practicing the functional core / imperative shell
+pattern.
 
-- `margin_call/` — IO interleaved with the business logic.
-- `margin_call_solution/` — functional core / imperative shell: the
-  decision logic lives in pure functions (`core.py`), all IO in `shell.py`.
+The `main` branch contains the starting exercise in `margin_call/`, with IO
+interleaved with business logic.
 
-The IO dependencies (`database.py`, `email_service.py`, `market_data_api.py`)
-are stubs that only log what they would do.
+The solution is in the
+[`engineered_solution` branch](https://github.com/renanreismartins/Imperative-Shell-Functional-Core/tree/engineered_solution),
+also under `margin_call/`. Its pure valuation and decision functions live in
+`core.py`, and `margin_call.py` handles IO and applies the decisions.
+
+The IO dependencies in `margin_call/infra/` (`database.py`, `email_service.py`,
+`market_data_api.py`) are stubs with canned data and logging. The example runs
+locally without external services.
 
 ## margin_call
 
-Run (from the repo root):
+Use Python 3.10 or newer. Run from the repo root:
 
 ```bash
 python3 -m margin_call
 ```
 
-Run tests (from the repo root):
+Install `pytest` in your Python environment, then run tests from the repo root:
 
 ```bash
+python3 -m pip install pytest
 python3 -m pytest margin_call/tests/
-```
-
-## margin_call_solution
-
-Run:
-
-```bash
-cd margin_call_solution
-python3 main.py
-```
-
-Run tests:
-
-```bash
-cd margin_call_solution
-python3 -m pytest tests/
 ```
 
 ## Triggering a margin call
 
-The canned account is healthy (margin level ≈ 3.2), so no margin call fires. To
-see the margin-call branch (DB write + email), raise a `margin_rate` above 1.0
-in the project's `infra/database.py`.
+The canned account is healthy (margin level ≈ 3.3), so no margin call fires. To
+see a database write and email alert, set AAPL's `margin_rate` to `1.5` in
+`margin_call/infra/database.py` and rerun the example. This raises the margin
+requirement above the portfolio value, bringing the margin level below `1.0`.
