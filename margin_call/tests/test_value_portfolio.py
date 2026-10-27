@@ -1,6 +1,6 @@
 import pytest
 
-from margin_call.margin_call import value_portfolio
+from margin_call.core import value_portfolio
 from margin_call.models import Position
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from margin_call.margin_call import decide_margin_action, value_portfolio
+from margin_call.core import decide_margin_action, value_portfolio
 from margin_call.models import (
     AccountStatus,
     NoAction,
