@@ -2,6 +2,7 @@ from margin_call.infra.database import db
 from margin_call.infra.email_service import email_service
 from margin_call.infra.market_data_api import market_data_api
 
+
 def process_margin_call(account_id: str) -> None:
     # SIDE EFFECT: IO read from database
     account = db.accounts.find_by_id(account_id)
