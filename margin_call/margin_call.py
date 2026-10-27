@@ -1,7 +1,7 @@
 from margin_call.infra.database import db
 from margin_call.infra.email_service import email_service
 from margin_call.infra.market_data_api import market_data_api
-from margin_call.models import Account
+from margin_call.models import Account, PortfolioValuation, Position
 
 
 def process_margin_call(account_id: str) -> None:
@@ -15,23 +15,29 @@ def process_margin_call(account_id: str) -> None:
     evaluate_margin(account, market_prices)
 
 
-def evaluate_margin(account: Account, market_prices: dict[str, float]) -> None:
-    total_portfolio_value = 0.0
-    maintenance_margin_requirement = 0.0
+def value_portfolio(
+    positions: list[Position], market_prices: dict[str, float]
+) -> PortfolioValuation:
+    total_value = 0.0
+    margin_requirement = 0.0
 
-    for position in account.positions:
+    for position in positions:
         price = market_prices.get(position.asset_id, 0.0)
         position_value = position.quantity * price
-        total_portfolio_value += position_value
-        maintenance_margin_requirement += position_value * position.margin_rate
+        total_value += position_value
+        margin_requirement += position_value * position.margin_rate
 
-    if maintenance_margin_requirement == 0:
+    return PortfolioValuation(total_value, margin_requirement)
+
+
+def evaluate_margin(account: Account, market_prices: dict[str, float]) -> None:
+    valuation = value_portfolio(account.positions, market_prices)
+
+    if valuation.margin_level is None:
         return
 
-    margin_level = total_portfolio_value / maintenance_margin_requirement
-
-    if margin_level < 1.0:
-        shortfall = maintenance_margin_requirement - total_portfolio_value
+    if valuation.margin_level < 1.0:
+        shortfall = valuation.margin_requirement - valuation.total_value
 
         account.status = 'MARGIN_CALL'
         account.margin_shortfall = shortfall
@@ -39,7 +45,7 @@ def evaluate_margin(account: Account, market_prices: dict[str, float]) -> None:
 
         email_service.send_margin_call_alert(account.email, shortfall)
 
-    elif margin_level > 1.5 and account.status == 'MARGIN_CALL':
+    elif valuation.margin_level > 1.5 and account.status == 'MARGIN_CALL':
         account.status = 'HEALTHY'
         account.margin_shortfall = 0.0
         db.accounts.save(account)
