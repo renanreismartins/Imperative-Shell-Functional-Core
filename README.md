@@ -3,7 +3,7 @@
 Two implementations of the same margin-call workflow:
 
 - `margin_call/` — IO interleaved with the business logic.
-- `margin_call_functional_core/` — functional core / imperative shell: the
+- `margin_call_solution/` — functional core / imperative shell: the
   decision logic lives in pure functions (`core.py`), all IO in `shell.py`.
 
 The IO dependencies (`database.py`, `email_service.py`, `market_data_api.py`)
@@ -23,19 +23,19 @@ Run tests (from the repo root):
 python3 -m pytest margin_call/tests/
 ```
 
-## margin_call_functional_core
+## margin_call_solution
 
 Run:
 
 ```bash
-cd margin_call_functional_core
+cd margin_call_solution
 python3 main.py
 ```
 
 Run tests:
 
 ```bash
-cd margin_call_functional_core
+cd margin_call_solution
 python3 -m pytest tests/
 ```
 
