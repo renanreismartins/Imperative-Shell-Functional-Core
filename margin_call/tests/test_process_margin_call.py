@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from margin_call.margin_call import process_margin_call
+from margin_call.margin_call import AccountNotFoundError, process_margin_call
 
 
 # The "not found" case belongs to the shell, so it keeps its db patch.
@@ -14,5 +14,7 @@ class TestProcessMarginCall:
     def test_account_not_found_raises(self, mock_db, mock_api, mock_email):
         mock_db.accounts.find_by_id.return_value = None
 
-        with pytest.raises(ValueError, match="Account not found"):
+        with pytest.raises(AccountNotFoundError) as exc_info:
             process_margin_call("MISSING")
+
+        assert exc_info.value.account_id == "MISSING"

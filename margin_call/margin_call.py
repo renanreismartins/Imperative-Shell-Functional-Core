@@ -5,10 +5,16 @@ from margin_call.infra.market_data_api import market_data_api
 from margin_call.models import NoAction, Recover, TriggerMarginCall
 
 
+class AccountNotFoundError(Exception):
+    def __init__(self, account_id: str):
+        super().__init__("Account not found")
+        self.account_id = account_id
+
+
 def process_margin_call(account_id: str) -> None:
     account = db.accounts.find_by_id(account_id)
     if not account:
-        raise ValueError("Account not found")
+        raise AccountNotFoundError(account_id)
 
     asset_ids = [p.asset_id for p in account.positions]
     market_prices = market_data_api.get_latest_prices(asset_ids)
