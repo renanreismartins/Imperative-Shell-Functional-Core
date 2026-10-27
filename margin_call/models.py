@@ -1,4 +1,10 @@
 from dataclasses import dataclass, field
+from enum import Enum
+
+
+class AccountStatus(Enum):
+    HEALTHY = "HEALTHY"
+    MARGIN_CALL = "MARGIN_CALL"
 
 
 @dataclass
@@ -24,6 +30,18 @@ class PortfolioValuation:
 class Account:
     id: str
     email: str
-    status: str = "HEALTHY"
+    status: AccountStatus = AccountStatus.HEALTHY
     margin_shortfall: float = 0.0
     positions: list[Position] = field(default_factory=list)
+
+    def enter_margin_call(self, shortfall: float) -> None:
+        self.status = AccountStatus.MARGIN_CALL
+        self.margin_shortfall = shortfall
+
+    def recover(self) -> None:
+        self.status = AccountStatus.HEALTHY
+        self.margin_shortfall = 0.0
+
+    @property
+    def in_margin_call(self) -> bool:
+        return self.status is AccountStatus.MARGIN_CALL

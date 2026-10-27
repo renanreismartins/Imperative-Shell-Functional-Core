@@ -39,13 +39,11 @@ def evaluate_margin(account: Account, market_prices: dict[str, float]) -> None:
     if valuation.margin_level < 1.0:
         shortfall = valuation.margin_requirement - valuation.total_value
 
-        account.status = 'MARGIN_CALL'
-        account.margin_shortfall = shortfall
+        account.enter_margin_call(shortfall)
         db.accounts.save(account)
 
         email_service.send_margin_call_alert(account.email, shortfall)
 
-    elif valuation.margin_level > 1.5 and account.status == 'MARGIN_CALL':
-        account.status = 'HEALTHY'
-        account.margin_shortfall = 0.0
+    elif valuation.margin_level > 1.5 and account.in_margin_call:
+        account.recover()
         db.accounts.save(account)

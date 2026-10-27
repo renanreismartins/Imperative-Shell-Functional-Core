@@ -7,16 +7,45 @@ from margin_call.margin_call import (
     process_margin_call,
     value_portfolio,
 )
-from margin_call.models import Account, Position
+from margin_call.models import Account, AccountStatus, Position
 
 
-def make_account(status="HEALTHY", positions=None):
+def make_account(status=AccountStatus.HEALTHY, positions=None):
     return Account(
         id="ACC-1",
         email="trader@example.com",
         status=status,
         positions=positions or [],
     )
+
+
+# Pure core: the model's state transitions, no mocks.
+class TestAccountTransitions:
+
+    def test_new_account_is_healthy(self):
+        account = make_account()
+
+        assert account.status is AccountStatus.HEALTHY
+        assert not account.in_margin_call
+
+    def test_enter_margin_call(self):
+        account = make_account()
+
+        account.enter_margin_call(500.0)
+
+        assert account.status is AccountStatus.MARGIN_CALL
+        assert account.in_margin_call
+        assert account.margin_shortfall == 500.0
+
+    def test_recover(self):
+        account = make_account(status=AccountStatus.MARGIN_CALL)
+        account.margin_shortfall = 500.0
+
+        account.recover()
+
+        assert account.status is AccountStatus.HEALTHY
+        assert not account.in_margin_call
+        assert account.margin_shortfall == 0.0
 
 
 # Pure core: no mocks, no patches — data in, data out.
@@ -77,7 +106,7 @@ class TestEvaluateMargin:
 
         evaluate_margin(account, {"AAPL": 100.0})
 
-        assert account.status == "HEALTHY"
+        assert account.status is AccountStatus.HEALTHY
         mock_db.accounts.save.assert_not_called()
         mock_email.send_margin_call_alert.assert_not_called()
 
@@ -90,7 +119,7 @@ class TestEvaluateMargin:
 
         evaluate_margin(account, {"TSLA": 100.0})
 
-        assert account.status == "MARGIN_CALL"
+        assert account.status is AccountStatus.MARGIN_CALL
         assert account.margin_shortfall == pytest.approx(500.0)
         mock_db.accounts.save.assert_called_once_with(account)
         mock_email.send_margin_call_alert.assert_called_once_with(
@@ -100,13 +129,13 @@ class TestEvaluateMargin:
     def test_recovery_back_to_healthy(self, mock_db, mock_email):
         # value = 10 * 100 = 1000; requirement = 1000 * 0.5 = 500
         # margin_level = 2.0 > 1.5 and status is MARGIN_CALL -> recover
-        account = make_account(status="MARGIN_CALL", positions=[
+        account = make_account(status=AccountStatus.MARGIN_CALL, positions=[
             Position(asset_id="AAPL", quantity=10, margin_rate=0.5),
         ])
 
         evaluate_margin(account, {"AAPL": 100.0})
 
-        assert account.status == "HEALTHY"
+        assert account.status is AccountStatus.HEALTHY
         assert account.margin_shortfall == 0.0
         mock_db.accounts.save.assert_called_once_with(account)
         mock_email.send_margin_call_alert.assert_not_called()
