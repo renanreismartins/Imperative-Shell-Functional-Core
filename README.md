@@ -1,46 +1,44 @@
 # Isolating IO
 
-Two implementations of the same margin-call workflow:
+A margin-call workflow structured around a functional core and an imperative shell.
+The `engineered_solution` branch contains the implementation in `margin_call/`:
 
-- `margin_call/` — IO interleaved with the business logic.
-- `margin_call_solution/` — functional core / imperative shell: the
-  decision logic lives in pure functions (`core.py`), all IO in `shell.py`.
+- `core.py` — pure functions that value a portfolio and decide whether to trigger
+  a margin call, recover, or take no action.
+- `models.py` — account state, snapshots, valuations, and decision types.
+- `margin_call.py` — the imperative shell: reads the account and market prices,
+  calls the core, applies the decision, saves changes, and sends alerts.
+- `infra/` — database, email, and market-data stubs with canned data and logging.
+- `tests/` — tests for account state, valuation, decisions, and error handling.
 
-The IO dependencies (`database.py`, `email_service.py`, `market_data_api.py`)
-are stubs that only log what they would do.
+The stubs let the example run locally without external services. Database writes
+and emails are logged.
 
-## margin_call
+## Running the example
 
-Run (from the repo root):
+Use Python 3.10 or newer. From the repo root:
 
 ```bash
 python3 -m margin_call
 ```
 
-Run tests (from the repo root):
+## Running tests
+
+Install `pytest` in your Python environment, then run from the repo root:
 
 ```bash
+python3 -m pip install pytest
 python3 -m pytest margin_call/tests/
-```
-
-## margin_call_solution
-
-Run:
-
-```bash
-cd margin_call_solution
-python3 main.py
-```
-
-Run tests:
-
-```bash
-cd margin_call_solution
-python3 -m pytest tests/
 ```
 
 ## Triggering a margin call
 
-The canned account is healthy (margin level ≈ 3.2), so no margin call fires. To
-see the margin-call branch (DB write + email), raise a `margin_rate` above 1.0
-in the project's `infra/database.py`.
+The canned account is healthy (margin level ≈ 3.3), so no margin call fires. To
+see a database write and email alert, set AAPL's `margin_rate` to `1.5` in
+`margin_call/infra/database.py` and rerun the example. This raises the margin
+requirement above the portfolio value, bringing the margin level below `1.0`.
+
+## Workshop notes
+
+[WORKSHOP_SESSION.md](margin_call/WORKSHOP_SESSION.md) records the refactoring
+session.
